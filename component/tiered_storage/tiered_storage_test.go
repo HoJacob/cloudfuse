@@ -487,6 +487,63 @@ func (suite *tieredStorageTestSuite) TestReadInBufferErrorBadFd() {
 	suite.assert.Equal(0, length)
 }
 
+// ok we gonna do file in local, cloud, file doesnt exist
+func (suite *tieredStorageTestSuite) TestDeleteFileCloud() {
+	defer suite.cleanupTest()
+	// Setup
+	file := "file16"
+
+	//put file in cloud abd write to it
+	handle, err := suite.tieredStorage.CreateFile(
+		internal.CreateFileOptions{Name: file, Mode: 0777},
+	)
+	suite.assert.NoError(err)
+	err = suite.tieredStorage.ReleaseFile(internal.ReleaseFileOptions{Handle: handle})
+	suite.assert.NoError(err)
+
+	err = suite.tieredStorage.DeleteFile(internal.DeleteFileOptions{Name: file})
+	suite.assert.NoError(err)
+
+	// Path should not be in file cache
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, file))
+
+	//file should not exist in cloud
+	_, err = suite.tieredStorage.NextComponent().GetAttr(
+		internal.GetAttrOptions{Name: file, RetrieveMetadata: true})
+	suite.assert.Error(err)
+
+}
+
+func (suite *tieredStorageTestSuite) TestDeleteFileLocal() {
+	defer suite.cleanupTest()
+	// Setup
+	file := "file16"
+
+	//create local file
+	_, err := suite.tieredStorage.CreateFile(
+		internal.CreateFileOptions{Name: file, Mode: 0777},
+	)
+	suite.assert.NoError(err)
+
+	err = suite.tieredStorage.DeleteFile(internal.DeleteFileOptions{Name: file})
+	suite.assert.NoError(err)
+
+	// Path should not be in file cache
+	suite.assert.NoFileExists(filepath.Join(suite.cache_path, file))
+
+}
+
+func (suite *tieredStorageTestSuite) TestDeleteFileNotExists() {
+	defer suite.cleanupTest()
+	// Setup
+	file := "file17"
+
+	err := suite.tieredStorage.DeleteFile(internal.DeleteFileOptions{Name: file})
+	suite.assert.Error(err)
+	suite.assert.EqualValues(syscall.ENOENT, err)
+
+}
+
 func TestTieredStorageTestSuite(t *testing.T) {
 	suite.Run(t, new(tieredStorageTestSuite))
 }
